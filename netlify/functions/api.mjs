@@ -8,6 +8,9 @@ import pg from "pg";
 
 pg.types.setTypeParser(20, v => Number(v)); // BIGINT (ts) -> number
 
+// Netlify.env is the documented way to read variables in functions; process.env is the fallback (local runs).
+const env = name => globalThis.Netlify?.env?.get(name) ?? process.env[name];
+
 const COOKIE = "jsn_session";
 const SESSION_SECONDS = 60 * 60 * 12;
 
@@ -16,7 +19,7 @@ let pool;
 let ready;
 function getPool() {
   if (!pool) {
-    const url = process.env.NETLIFY_DATABASE_URL_UNPOOLED || process.env.NETLIFY_DATABASE_URL || process.env.DATABASE_URL;
+    const url = env("NETLIFY_DATABASE_URL_UNPOOLED") || env("NETLIFY_DATABASE_URL") || env("DATABASE_URL");
     if (!url) throw new HttpError(500, { error: "Database is not set up. Add Netlify DB to this site." });
     pool = new pg.Pool({ connectionString: url, max: 1 });
   }
@@ -104,8 +107,8 @@ async function stockRows(c) {
 /* ---------------------------------------------------------------- auth */
 const b64 = b => Buffer.from(b).toString("base64url");
 function secret() {
-  if (!process.env.SESSION_SECRET) throw new HttpError(500, { error: "SESSION_SECRET is not set on the server." });
-  return process.env.SESSION_SECRET;
+  if (!env("SESSION_SECRET")) throw new HttpError(500, { error: "SESSION_SECRET is not set on the server." });
+  return env("SESSION_SECRET");
 }
 const sign = p => crypto.createHmac("sha256", secret()).update(p).digest("base64url");
 function makeToken(user) {
@@ -134,10 +137,10 @@ const cookie = (value, maxAge) =>
 /* ---------------------------------------------------------------- handlers */
 async function login(req) {
   const d = await req.json().catch(() => ({}));
-  const adminPass = process.env.ADMIN_PASSWORD;
+  const adminPass = env("ADMIN_PASSWORD");
   if (!adminPass) throw new HttpError(500, { error: "ADMIN_PASSWORD is not set on the server." });
   const user = String(d.username ?? "").trim();
-  const ok = sameText(user, process.env.ADMIN_USER || "admin") & sameText(d.password ?? "", adminPass);
+  const ok = sameText(user, env("ADMIN_USER") || "admin") & sameText(d.password ?? "", adminPass);
   if (!ok) {
     await new Promise(r => setTimeout(r, 600)); // slow down password guessing
     throw new HttpError(401, { error: "User name or password is incorrect. Check and try again." });
