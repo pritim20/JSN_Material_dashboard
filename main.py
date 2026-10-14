@@ -3,7 +3,7 @@ JSN AI Material - Material Inventory Management System
 ------------------------------------------------------
 Run:   python main.py
 Open:  http://127.0.0.1:5000
-Login: admin / Jsn*@2026
+Login: user "admin" and the password you set in JSN_ADMIN_PASS
 """
 
 import csv
@@ -24,7 +24,10 @@ SECRET_FILE = os.path.join(BASE_DIR, ".secret_key")
 
 APP_NAME = "JSN AI Material"
 ADMIN_USER = os.environ.get("JSN_ADMIN_USER", "admin")
-ADMIN_PASS_HASH = generate_password_hash(os.environ.get("JSN_ADMIN_PASS", "Jsn*@2026"))
+_admin_pass = os.environ.get("JSN_ADMIN_PASS")
+if not _admin_pass:
+    raise SystemExit("Set the login password first, e.g.  JSN_ADMIN_PASS='your-password' python main.py")
+ADMIN_PASS_HASH = generate_password_hash(_admin_pass)
 LOW_STOCK = float(os.environ.get("JSN_LOW_STOCK", "5"))  # at or below = "Low stock"
 
 

@@ -2,6 +2,10 @@
   publish = "public"
   functions = "netlify/functions"
 
+[build.environment]
+  # "admin" is a plain word that appears in the page text, so it is not a real secret.
+  SECRETS_SCAN_OMIT_KEYS = "ADMIN_USER"
+
 # Clean page URLs (the API itself is routed from inside netlify/functions/api.mjs)
 [[redirects]]
   from = "/login"

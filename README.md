@@ -12,13 +12,13 @@ python -m venv venv
 # Windows:  venv\Scripts\activate
 # Mac/Linux: source venv/bin/activate
 pip install -r requirements.txt
-python main.py
+JSN_ADMIN_PASS='choose-a-password' python main.py   # Windows PowerShell: $env:JSN_ADMIN_PASS='choose-a-password'; python main.py
 ```
 
 Open http://127.0.0.1:5000 and sign in:
 
 - **User name:** `admin`
-- **Password:** `Jsn*@2026`
+- **Password:** the one you set in `JSN_ADMIN_PASS` (see below)
 
 ## Features
 
@@ -47,7 +47,7 @@ Then open `http://<this-PC's-IP>:5000` from the other PCs.
 | Variable | Default | Purpose |
 |---|---|---|
 | `JSN_ADMIN_USER` | `admin` | Login user name |
-| `JSN_ADMIN_PASS` | `Jsn*@2026` | Login password |
+| `JSN_ADMIN_PASS` | none, required | Login password |
 | `JSN_LOW_STOCK` | `5` | Low-stock threshold |
 | `JSN_HOST` / `JSN_PORT` | `127.0.0.1` / `5000` | Address the server listens on |
 | `JSN_DB_PATH` | `inventory.db` | Database file location |
