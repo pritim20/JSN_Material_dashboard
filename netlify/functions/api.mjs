@@ -270,6 +270,9 @@ export default async (req) => {
     const path = url.pathname.replace(/\/+$/, "");
     const m = req.method;
 
+    if (path === "/api/health" && m === "GET") // setup check: says only whether each setting exists, never its value
+      return json({ ADMIN_PASSWORD: !!env("ADMIN_PASSWORD"), SESSION_SECRET: !!env("SESSION_SECRET"), ADMIN_USER: !!env("ADMIN_USER"),
+                    database: !!(env("NETLIFY_DATABASE_URL") || env("NETLIFY_DATABASE_URL_UNPOOLED") || env("DATABASE_URL")) });
     if (path === "/api/login" && m === "POST") return await login(req);
     if (path === "/logout") return new Response(null, { status: 302, headers: { Location: "/login", "Set-Cookie": cookie("", 0) } });
 
