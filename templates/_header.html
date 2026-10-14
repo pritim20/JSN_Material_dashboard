@@ -1,0 +1,19 @@
+  <header class="bar">
+    <div class="wrap">
+      <div class="logo">
+        <div class="mark">JSN</div>
+        <div><b>{{ app_name }}</b><small>Inventory control</small></div>
+      </div>
+      <nav class="nav">
+        <a class="btn btn-nav nav-stock" href="{{ url_for('dashboard') }}"{% if page == 'stock' %} aria-current="page"{% endif %}>Stock</a>
+        <a class="btn btn-nav nav-history" href="{{ url_for('history') }}"{% if page == 'history' %} aria-current="page"{% endif %}>History</a>
+      </nav>
+      <div class="actions">
+        <button class="btn btn-nav nav-in" id="openIn" type="button">Material In</button>
+        <button class="btn btn-nav nav-out" id="openOut" type="button">Material Out</button>
+      </div>
+      <div class="who"><div class="avatar">AD</div><span>{{ user }}</span>
+        <a class="btn btn-ghost" href="{{ url_for('export_csv') }}" style="padding:7px 12px;font-size:13px;text-decoration:none">Export CSV</a>
+        <a class="btn btn-ghost" href="{{ url_for('logout') }}" style="padding:7px 12px;font-size:13px;text-decoration:none">Log out</a></div>
+    </div>
+  </header>

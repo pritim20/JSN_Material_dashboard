@@ -1,0 +1,97 @@
+<!-- ================= MATERIAL IN ================= -->
+<div class="overlay" id="mIn" hidden>
+  <div class="modal m-in" role="dialog" aria-modal="true" aria-labelledby="mInT">
+    <div class="modal-h">
+      <div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12M6 10l6 6 6-6M5 20h14"/></svg></div>
+      <div><h3 id="mInT">Material In</h3><p>Record material received into the store.</p></div>
+      <button class="x" type="button" data-close aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <form id="fIn" novalidate>
+      <div class="field" data-k="name">
+        <label for="inMat">Material<span class="req">*</span></label>
+        <select id="inMat"></select>
+        <input id="inName" placeholder="Enter new material name" autocomplete="off" hidden>
+        <span class="hint" id="inHint">Select a material, or choose “New material…” to add one.</span>
+        <span class="err"></span>
+      </div>
+      <div class="row2">
+        <div class="field" data-k="qty">
+          <label for="inQty">Quantity<span class="req">*</span></label>
+          <input id="inQty" type="number" min="0" step="any" inputmode="decimal" placeholder="0">
+          <span class="err"></span>
+        </div>
+        <div class="field" data-k="by">
+          <label for="inBy">In by (person name)<span class="req">*</span></label>
+          <input id="inBy" placeholder="Received by" autocomplete="off">
+          <span class="err"></span>
+        </div>
+      </div>
+      <div class="field" data-k="date">
+        <label for="inDate">Date<span class="req">*</span></label>
+        <input id="inDate" type="date">
+        <span class="err"></span>
+      </div>
+      <div class="foot">
+        <button class="btn btn-del" type="button" data-del hidden>Delete</button>
+        <button class="btn btn-ghost" type="button" data-close>Cancel</button>
+        <button class="btn btn-in" type="submit">Save Material In</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ================= MATERIAL OUT ================= -->
+<div class="overlay" id="mOut" hidden>
+  <div class="modal m-out" role="dialog" aria-modal="true" aria-labelledby="mOutT">
+    <div class="modal-h">
+      <div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M6 10l6-6 6 6M5 20h14"/></svg></div>
+      <div><h3 id="mOutT">Material Out</h3><p>Issue material from the store to a project.</p></div>
+      <button class="x" type="button" data-close aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <form id="fOut" novalidate>
+      <div class="field" data-k="mat">
+        <label for="outMat">Material<span class="req">*</span></label>
+        <select id="outMat"></select>
+        <span class="err"></span>
+      </div>
+      <div class="avail" id="availBox" hidden><span>Available in store</span><b id="availQty">0</b></div>
+      <div class="row2">
+        <div class="field" data-k="qty">
+          <label for="outQty">Quantity out<span class="req">*</span></label>
+          <input id="outQty" type="number" min="0" step="any" inputmode="decimal" placeholder="0">
+          <span class="err"></span>
+        </div>
+        <div class="field" data-k="by">
+          <label for="outBy">Out by<span class="req">*</span></label>
+          <input id="outBy" placeholder="Issued by" autocomplete="off">
+          <span class="err"></span>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field" data-k="project">
+          <label for="outProj">For which project<span class="req">*</span></label>
+          <input id="outProj" list="projList" placeholder="Project name" autocomplete="off">
+          <span class="err"></span>
+        </div>
+        <div class="field" data-k="handover">
+          <label for="outTo">Handover to<span class="req">*</span></label>
+          <input id="outTo" placeholder="Receiver name" autocomplete="off">
+          <span class="err"></span>
+        </div>
+      </div>
+      <div class="field" data-k="date">
+        <label for="outDate">Date<span class="req">*</span></label>
+        <input id="outDate" type="date">
+        <span class="err"></span>
+      </div>
+      <div class="foot">
+        <button class="btn btn-del" type="button" data-del hidden>Delete</button>
+        <button class="btn btn-ghost" type="button" data-close>Cancel</button>
+        <button class="btn btn-out" type="submit">Save Material Out</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<datalist id="projList"></datalist>
+<div class="toast" id="toast" hidden></div>

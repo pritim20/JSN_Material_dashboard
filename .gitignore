@@ -1,0 +1,6 @@
+node_modules/
+.env
+.netlify/
+__pycache__/
+.secret_key
+inventory.db

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Sign in · JSN AI Material</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@500;700&display=swap">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<section id="login">
+  <div class="login-card">
+    <div class="logo">
+      <div class="mark">JSN</div>
+      <div><b>JSN AI Material</b><small>Inventory control</small></div>
+    </div>
+    <div>
+      <h1>Sign in to the store</h1>
+      <p>Track every material that comes in and goes out.</p>
+    </div>
+    <form id="lf" style="display:grid;gap:14px">
+      <div class="field">
+        <label for="lu">User name</label>
+        <input id="lu" name="username" autocomplete="username" placeholder="admin" required autofocus>
+      </div>
+      <div class="field">
+        <label for="lp">Password</label>
+        <input id="lp" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required>
+      </div>
+      
+      <div class="form-err" id="lerr" hidden></div>
+      <button class="btn btn-primary" type="submit">Sign in</button>
+    </form>
+  </div>
+</section>
+<script>
+document.getElementById("lf").addEventListener("submit", async e => {
+  e.preventDefault();
+  const btn = e.target.querySelector("[type=submit]"), err = document.getElementById("lerr");
+  btn.disabled = true; err.hidden = true;
+  try {
+    const res = await fetch("/api/login", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: e.target.username.value, password: e.target.password.value }) });
+    const j = await res.json().catch(() => ({}));
+    if (res.ok) { location.href = "/"; return; }
+    err.textContent = j.error || "Could not sign in. Try again."; err.hidden = false;
+  } catch (x) { err.textContent = "Could not reach the server. Try again."; err.hidden = false; }
+  btn.disabled = false;
+});
+</script>
+</body>
+</html>
