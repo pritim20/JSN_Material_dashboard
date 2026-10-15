@@ -185,6 +185,13 @@ def history():
                            user=session["user"], low_stock=LOW_STOCK)
 
 
+@app.route("/report")
+@login_required
+def report():
+    return render_template("report.html", app_name=APP_NAME, page="report",
+                           user=session["user"], low_stock=LOW_STOCK)
+
+
 # ---------------------------------------------------------------- API
 @app.get("/api/history")
 @login_required

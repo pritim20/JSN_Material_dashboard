@@ -51,12 +51,14 @@
     if (!$("#mOut").hidden) fillOutSelect(true);
   }
 
-  // one line per company: every material issued to it, with the total quantity
+  // Report page: one row per company and material issued to it, with the quantity
   function renderReport() {
-    $("#report").innerHTML = (data.report || []).length ? data.report.map(c => `<tr>
-        <td><b>${esc(c.company)}</b></td>
-        <td>${c.items.map(i => `${esc(i.name)}: <b>${fmt(i.qty)}</b>`).join(" &nbsp;·&nbsp; ")}</td>
-      </tr>`).join("") : `<tr><td colspan="2" class="log-empty">No material has been issued yet.</td></tr>`;
+    const rows = (data.report || []).flatMap(c => c.items.map(i => ({ company: c.company, name: i.name, qty: i.qty })));
+    $("#report").innerHTML = rows.length ? rows.map(r => `<tr>
+        <td>${esc(r.company)}</td>
+        <td>${esc(r.name)}</td>
+        <td class="num">${fmt(r.qty)}</td>
+      </tr>`).join("") : `<tr><td colspan="3" class="log-empty">No material has been issued yet.</td></tr>`;
   }
 
   function renderStock(items) {

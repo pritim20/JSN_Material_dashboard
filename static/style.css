@@ -84,6 +84,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .nav-stock{--g1:#5B4BFF;--g2:#8A5CFF}
 .nav-history{--g1:#0A72B8;--g2:#13A0C9}
 .nav-in{--g1:#0B8A5E;--g2:#14B37D}
+.nav-report{--g1:#B0195F;--g2:#FF5FA2}
 .nav-out{--g1:#D9481F;--g2:#FF7A45}
 .bar .actions{display:flex;gap:10px;flex-wrap:wrap}
 .who{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}
@@ -152,7 +153,9 @@ td.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:7
 th.num{text-align:right}
 .stock-tbl,.report-tbl{min-width:0}
 .report-tbl td{vertical-align:middle}
-.report-tbl td:first-child{white-space:nowrap}
+.report-tbl td:first-child{white-space:nowrap;font-weight:600}
+.report-tbl{min-width:480px}
+.report-tbl th.num,.report-tbl td.num{text-align:center}
 .stock-tbl th.num,.stock-tbl td.num{text-align:center}
 .stock-tbl td{vertical-align:middle}
 td .sub{color:var(--muted);font-size:12.5px}

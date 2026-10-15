@@ -7,6 +7,7 @@
       <nav class="nav">
         <a class="btn btn-nav nav-stock" href="{{ url_for('dashboard') }}"{% if page == 'stock' %} aria-current="page"{% endif %}>Stock</a>
         <a class="btn btn-nav nav-history" href="{{ url_for('history') }}"{% if page == 'history' %} aria-current="page"{% endif %}>History</a>
+        <a class="btn btn-nav nav-report" href="{{ url_for('report') }}"{% if page == 'report' %} aria-current="page"{% endif %}>Report</a>
       </nav>
       <div class="actions">
         <button class="btn btn-nav nav-in" id="openIn" type="button">Material In</button>

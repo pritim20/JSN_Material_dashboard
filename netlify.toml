@@ -17,5 +17,10 @@
   to = "/history.html"
   status = 200
 
+[[redirects]]
+  from = "/report"
+  to = "/report.html"
+  status = 200
+
 [functions]
   node_bundler = "esbuild"
