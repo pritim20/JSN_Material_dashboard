@@ -75,6 +75,7 @@ def init_db():
             material_key TEXT    NOT NULL,
             qty          REAL    NOT NULL CHECK (qty > 0),
             by_name      TEXT    NOT NULL,
+            company      TEXT,
             project      TEXT,
             handover     TEXT,
             remarks      TEXT,
@@ -84,6 +85,8 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_txns_ts  ON txns(ts);
         """
     )
+    if "company" not in [r[1] for r in con.execute("PRAGMA table_info(txns)")]:
+        con.execute("ALTER TABLE txns ADD COLUMN company TEXT")  # databases created before the Company field
     con.commit()
     con.close()
 
@@ -118,11 +121,11 @@ def stock_rows(db):
 
 
 def report_rows(db):
-    """Per company (project): every material issued to it with the total quantity."""
+    """Per company: every material issued to it with the total quantity (older entries fall back to the project name)."""
     companies = {}
-    for r in db.execute("SELECT project, material, material_key, qty FROM txns "
-                        "WHERE type='out' AND project IS NOT NULL AND project<>'' ORDER BY id"):
-        c = companies.setdefault(mkey(r["project"]), {"company": r["project"], "items": {}})
+    for r in db.execute("SELECT COALESCE(NULLIF(company,''), project) AS company, material, material_key, qty FROM txns "
+                        "WHERE type='out' AND COALESCE(NULLIF(company,''), project, '') <> '' ORDER BY id"):
+        c = companies.setdefault(mkey(r["company"]), {"company": r["company"], "items": {}})
         it = c["items"].setdefault(r["material_key"], {"name": r["material"], "qty": 0})
         it["qty"] = round(it["qty"] + r["qty"], 3)
     return [{"company": c["company"],
@@ -197,7 +200,7 @@ def report():
 @login_required
 def api_history():
     rows = get_db().execute(
-        "SELECT id,type,material,material_key,qty,by_name AS by,project,handover,ts "
+        "SELECT id,type,material,material_key,qty,by_name AS by,company,project,handover,ts "
         "FROM txns ORDER BY ts DESC, id DESC")
     return jsonify({"txns": [dict(r) for r in rows]})
 
@@ -280,6 +283,7 @@ def api_out():
     key = mkey(d.get("material"))
     qty = parse_qty(d.get("qty"))
     by, project, handover = clean(d.get("by")), clean(d.get("project")), clean(d.get("handover"))
+    company = clean(d.get("company"))
     errors = {}
     if not key:
         errors["mat"] = "Select a material to issue."
@@ -287,6 +291,8 @@ def api_out():
         errors["qty"] = "Enter a quantity greater than 0."
     if not by:
         errors["by"] = "Enter who issued the material."
+    if not company:
+        errors["company"] = "Enter the company name."
     if not project:
         errors["project"] = "Enter the project name."
     if not handover:
@@ -308,9 +314,9 @@ def api_out():
             db.execute("ROLLBACK")
             return jsonify({"errors": {"qty": f"Only {bal:g} available."}}), 400
         db.execute(
-            "INSERT INTO txns(type,material,material_key,qty,by_name,project,handover,remarks,ts) "
-            "VALUES('out',?,?,?,?,?,?,?,?)",
-            (name, key, qty, by, project, handover, clean(d.get("remarks")), ts))
+            "INSERT INTO txns(type,material,material_key,qty,by_name,company,project,handover,remarks,ts) "
+            "VALUES('out',?,?,?,?,?,?,?,?,?)",
+            (name, key, qty, by, company, project, handover, clean(d.get("remarks")), ts))
         db.execute("COMMIT")
     except Exception:
         db.execute("ROLLBACK")
@@ -331,6 +337,7 @@ def api_txn_edit(tid):
 
     qty, by, ts = parse_qty(d.get("qty")), clean(d.get("by")), parse_ts(d.get("ts"))
     project, handover = clean(d.get("project")), clean(d.get("handover"))
+    company = clean(d.get("company"))
     name = clean(d.get("material")) if is_in else ""
     key = mkey(name) if is_in else mkey(d.get("material"))
     errors = {}
@@ -343,6 +350,8 @@ def api_txn_edit(tid):
     if ts is None:
         errors["date"] = "Pick a valid date (not in the future)."
     if not is_in:
+        if not company:
+            errors["company"] = "Enter the company name."
         if not project:
             errors["project"] = "Enter the project name."
         if not handover:
@@ -358,8 +367,9 @@ def api_txn_edit(tid):
             return jsonify({"errors": {"mat": "This material is not in stock."}}), 400
         display = existing or name
         db.execute(
-            "UPDATE txns SET material=?, material_key=?, qty=?, by_name=?, project=?, handover=?, ts=? WHERE id=?",
-            (display, key, qty, by, None if is_in else project, None if is_in else handover, ts, tid))
+            "UPDATE txns SET material=?, material_key=?, qty=?, by_name=?, company=?, project=?, handover=?, ts=? WHERE id=?",
+            (display, key, qty, by, None if is_in else company, None if is_in else project,
+             None if is_in else handover, ts, tid))
         for k in {row["material_key"], key}:
             bal, nm = balance_of(db, k)
             if bal < -1e-9:
@@ -401,13 +411,13 @@ def export_csv():
     db = get_db()
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow(["Date", "Type", "Material", "Quantity", "By", "Handed over to", "Project"])
+    w.writerow(["Date", "Type", "Material", "Quantity", "By", "Handed over to", "Company", "Project"])
     for r in db.execute("SELECT * FROM txns ORDER BY ts DESC, id DESC"):  # newest first, same as History
         t = time.localtime(r["ts"] / 1000)
         w.writerow([time.strftime("%d %b %Y", t),
                     "Material In" if r["type"] == "in" else "Material Out",
                     r["material"], f'{r["qty"]:g}', r["by_name"],
-                    r["handover"] or "-", r["project"] or "-"])
+                    r["handover"] or "-", r["company"] or "-", r["project"] or "-"])
     # BOM so Excel opens the file as UTF-8 and shows it in tidy columns
     return Response("\ufeff" + buf.getvalue(), mimetype="text/csv", content_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": "attachment; filename=jsn-material-history.csv"})

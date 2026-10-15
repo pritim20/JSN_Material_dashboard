@@ -46,6 +46,7 @@
     if ($("#stock")) renderStock(items);
     if ($("#report")) renderReport();
     fillInSelect();
+    $("#coList").innerHTML = [...new Set((data.report || []).map(c => c.company))].map(c => `<option value="${esc(c)}"></option>`).join("");
     $("#projList").innerHTML = data.projects.map(p => `<option value="${esc(p)}"></option>`).join("");
     if (!$("#mOut").hidden) fillOutSelect(true);
   }
@@ -188,18 +189,19 @@
     const f = e.target; clearErrs(f);
     const m = stockMap().get($("#outMat").value);
     const qty = parseFloat($("#outQty").value);
-    const by = $("#outBy").value.trim(), project = $("#outProj").value.trim(), handover = $("#outTo").value.trim();
+    const by = $("#outBy").value.trim(), company = $("#outCo").value.trim(), project = $("#outProj").value.trim(), handover = $("#outTo").value.trim();
     let ok = true;
     if (!m) { setErr(f, "mat", "Select a material to issue."); ok = false; }
     if (!(qty > 0)) { setErr(f, "qty", "Enter a quantity greater than 0."); ok = false; }
     else if (m && qty > availOf(m) + 1e-9) { setErr(f, "qty", `Only ${fmt(availOf(m))} available.`); ok = false; }
     if (!by) { setErr(f, "by", "Enter who issued the material."); ok = false; }
+    if (!company) { setErr(f, "company", "Enter the company name."); ok = false; }
     if (!project) { setErr(f, "project", "Enter the project name."); ok = false; }
     if (!handover) { setErr(f, "handover", "Enter who received it."); ok = false; }
     const date = $("#outDate").value;
     if (!date || date > todayStr()) { setErr(f, "date", "Pick a valid date (not in the future)."); ok = false; }
     if (!ok) return;
-    submit(f, "/api/out", { material: m.key, qty, by, project, handover, ts: tsFor("#outDate") }, () => { editing = null; close($("#mOut")); });
+    submit(f, "/api/out", { material: m.key, qty, by, company, project, handover, ts: tsFor("#outDate") }, () => { editing = null; close($("#mOut")); });
   });
 
   /* ---------- edit an existing entry (called from the History page) ---------- */
@@ -213,7 +215,7 @@
     } else {
       const f = $("#fOut"); f.reset(); clearErrs(f); fillOutSelect(false); setDate("#outDate");
       $("#outMat").value = t.material_key; updAvail();
-      $("#outQty").value = t.qty; $("#outBy").value = t.by; $("#outProj").value = t.project || "";
+      $("#outQty").value = t.qty; $("#outBy").value = t.by; $("#outCo").value = t.company || t.project || ""; $("#outProj").value = t.project || "";
       $("#outTo").value = t.handover || ""; $("#outDate").value = dateStr(t.ts);
       setMode("out"); open("#mOut");
     }

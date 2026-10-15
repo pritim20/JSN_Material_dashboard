@@ -79,13 +79,14 @@ function stockRows(txns) {
     .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
 }
 
-// Per company (project): every material issued to it with the total quantity
+// Per company: every material issued to it with the total quantity
 function reportRows(txns) {
   const companies = new Map();
   for (const t of txns) {
-    if (t.type !== "out" || !t.project) continue;
-    const k = mkey(t.project);
-    if (!companies.has(k)) companies.set(k, { company: t.project, items: new Map() });
+    const co = t.company || t.project; // older entries have no company: fall back to the project name
+    if (t.type !== "out" || !co) continue;
+    const k = mkey(co);
+    if (!companies.has(k)) companies.set(k, { company: co, items: new Map() });
     const items = companies.get(k).items;
     const it = items.get(t.material_key) ?? { name: t.material, qty: 0 };
     it.qty = r3(it.qty + t.qty);
@@ -153,7 +154,7 @@ async function apiHistory() {
   return { txns: [...doc.txns].sort(byNewest).map(({ by_name, remarks, ...t }) => ({ ...t, by: by_name })) };
 }
 
-const addTxn = (doc, t) => { doc.txns.push({ id: doc.nextId++, remarks: "", project: null, handover: null, ...t }); };
+const addTxn = (doc, t) => { doc.txns.push({ id: doc.nextId++, remarks: "", company: null, project: null, handover: null, ...t }); };
 
 async function apiIn(d) {
   const name = clean(d.material), by = clean(d.by), qty = parseQty(d.qty), ts = parseTs(d.ts);
@@ -175,11 +176,12 @@ async function apiIn(d) {
 
 async function apiOut(d) {
   const key = mkey(d.material), qty = parseQty(d.qty), by = clean(d.by);
-  const project = clean(d.project), handover = clean(d.handover), ts = parseTs(d.ts);
+  const company = clean(d.company), project = clean(d.project), handover = clean(d.handover), ts = parseTs(d.ts);
   const errors = {};
   if (!key) errors.mat = "Select a material to issue.";
   if (qty === null) errors.qty = "Enter a quantity greater than 0.";
   if (!by) errors.by = "Enter who issued the material.";
+  if (!company) errors.company = "Enter the company name.";
   if (!project) errors.project = "Enter the project name.";
   if (!handover) errors.handover = "Enter who received it.";
   if (ts === null) errors.date = "Pick a valid date (not in the future).";
@@ -189,7 +191,7 @@ async function apiOut(d) {
     const [bal, name] = balanceOf(doc.txns, key);
     if (!name || bal <= 0) throw bad({ mat: "This material is not in stock." });
     if (qty > bal + 1e-9) throw bad({ qty: `Only ${bal} available.` });
-    addTxn(doc, { type: "out", material: name, material_key: key, qty, by_name: by, project, handover, ts });
+    addTxn(doc, { type: "out", material: name, material_key: key, qty, by_name: by, company, project, handover, ts });
     return name;
   });
   return { ok: true, message: `Issued ${qty} × ${name} to ${project}` };
@@ -201,7 +203,7 @@ async function apiEdit(id, d) {
     if (!row) throw new HttpError(404, { errors: { qty: "This entry no longer exists." } });
     const isIn = row.type === "in";
     const qty = parseQty(d.qty), by = clean(d.by), ts = parseTs(d.ts);
-    const project = clean(d.project), handover = clean(d.handover);
+    const company = clean(d.company), project = clean(d.project), handover = clean(d.handover);
     const name = isIn ? clean(d.material) : "";
     const key = mkey(d.material);
     const errors = {};
@@ -209,6 +211,7 @@ async function apiEdit(id, d) {
     if (qty === null) errors.qty = "Enter a quantity greater than 0.";
     if (!by) errors.by = isIn ? "Enter who received the material." : "Enter who issued the material.";
     if (ts === null) errors.date = "Pick a valid date (not in the future).";
+    if (!isIn && !company) errors.company = "Enter the company name.";
     if (!isIn && !project) errors.project = "Enter the project name.";
     if (!isIn && !handover) errors.handover = "Enter who received it.";
     if (Object.keys(errors).length) throw bad(errors);
@@ -217,7 +220,7 @@ async function apiEdit(id, d) {
     const existing = balanceOf(doc.txns, key)[1];
     if (!isIn && !existing) throw bad({ mat: "This material is not in stock." });
     Object.assign(row, { material: existing || name, material_key: key, qty, by_name: by,
-      project: isIn ? null : project, handover: isIn ? null : handover, ts });
+      company: isIn ? null : company, project: isIn ? null : project, handover: isIn ? null : handover, ts });
     for (const k of new Set([oldKey, key])) {
       const [bal, nm] = balanceOf(doc.txns, k);
       if (bal < -1e-9) throw bad({ qty: `This change would leave ${nm} with ${bal} in stock.` });
@@ -243,11 +246,11 @@ async function exportCsv(url) {
   const tz = Number(url.searchParams.get("tz")) || 0; // browser offset, e.g. -330 for IST
   const { doc } = await load();
   const rows = [...doc.txns].sort(byNewest);
-  const lines = [["Date", "Type", "Material", "Quantity", "By", "Handed over to", "Project"]];
+  const lines = [["Date", "Type", "Material", "Quantity", "By", "Handed over to", "Company", "Project"]];
   for (const r of rows) {
     const d = new Date(r.ts - tz * 60000); // shift, then read with UTC getters = viewer's local date
     lines.push([`${String(d.getUTCDate()).padStart(2, "0")} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`,
-      r.type === "in" ? "Material In" : "Material Out", r.material, r.qty, r.by_name, r.handover || "-", r.project || "-"]);
+      r.type === "in" ? "Material In" : "Material Out", r.material, r.qty, r.by_name, r.handover || "-", r.company || "-", r.project || "-"]);
   }
   return new Response("﻿" + lines.map(l => l.map(csvCell).join(",")).join("\r\n") + "\r\n", {
     headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": "attachment; filename=jsn-material-history.csv", "Cache-Control": "no-store" },

@@ -20,6 +20,7 @@
       <td>${esc(t.material)}</td>
       <td class="num" style="color:var(--${t.type === "in" ? "in" : "out"})">${t.type === "in" ? "+" : "−"}${fmt(t.qty)}</td>
       <td>${esc(t.by)}</td>
+      <td>${esc(t.company || "—")}</td>
       <td>${esc(t.project || "—")}</td>
       <td>${esc(t.handover || "—")}</td>
       <td><button class="btn btn-ghost" type="button" data-edit="${t.id}" style="padding:6px 12px;font-size:13px">Edit</button></td>
@@ -42,7 +43,7 @@
     }
     $("#hist").innerHTML = keys.map(k => {
       const list = groups.get(k);
-      return `<tr class="grp"><td colspan="8">${esc(k)}<span>${list.length} ${list.length === 1 ? "entry" : "entries"}</span></td></tr>` + list.map(row).join("");
+      return `<tr class="grp"><td colspan="9">${esc(k)}<span>${list.length} ${list.length === 1 ? "entry" : "entries"}</span></td></tr>` + list.map(row).join("");
     }).join("");
   }
 

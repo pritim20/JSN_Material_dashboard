@@ -134,16 +134,21 @@
         </div>
       </div>
       <div class="row2">
+        <div class="field" data-k="company">
+          <label for="outCo">Company name<span class="req">*</span></label>
+          <input id="outCo" list="coList" placeholder="Company name" autocomplete="off">
+          <span class="err"></span>
+        </div>
         <div class="field" data-k="project">
-          <label for="outProj">For which project<span class="req">*</span></label>
+          <label for="outProj">Project name<span class="req">*</span></label>
           <input id="outProj" list="projList" placeholder="Project name" autocomplete="off">
           <span class="err"></span>
         </div>
-        <div class="field" data-k="handover">
-          <label for="outTo">Handover to<span class="req">*</span></label>
-          <input id="outTo" placeholder="Receiver name" autocomplete="off">
-          <span class="err"></span>
-        </div>
+      </div>
+      <div class="field" data-k="handover">
+        <label for="outTo">Handover to<span class="req">*</span></label>
+        <input id="outTo" placeholder="Receiver name" autocomplete="off">
+        <span class="err"></span>
       </div>
       <div class="field" data-k="date">
         <label for="outDate">Date<span class="req">*</span></label>
@@ -160,6 +165,7 @@
 </div>
 
 <datalist id="projList"></datalist>
+<datalist id="coList"></datalist>
 <div class="toast" id="toast" hidden></div>
 <script src="/app.js"></script>
 </body>
