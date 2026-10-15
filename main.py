@@ -117,6 +117,19 @@ def stock_rows(db):
     return out
 
 
+def report_rows(db):
+    """Per company (project): every material issued to it with the total quantity."""
+    companies = {}
+    for r in db.execute("SELECT project, material, material_key, qty FROM txns "
+                        "WHERE type='out' AND project IS NOT NULL AND project<>'' ORDER BY id"):
+        c = companies.setdefault(mkey(r["project"]), {"company": r["project"], "items": {}})
+        it = c["items"].setdefault(r["material_key"], {"name": r["material"], "qty": 0})
+        it["qty"] = round(it["qty"] + r["qty"], 3)
+    return [{"company": c["company"],
+             "items": sorted(c["items"].values(), key=lambda i: i["name"].lower())}
+            for c in sorted(companies.values(), key=lambda c: c["company"].lower())]
+
+
 def balance_of(db, key):
     r = db.execute(
         "SELECT COALESCE(SUM(CASE WHEN type='in' THEN qty ELSE -qty END),0) AS b, "
@@ -200,7 +213,7 @@ def api_data():
     projects = [r[0] for r in db.execute(
         "SELECT DISTINCT project FROM txns WHERE project IS NOT NULL AND project<>'' "
         "ORDER BY project COLLATE NOCASE")]
-    return jsonify({"stock": stock_rows(db), "txns": txns, "projects": projects,
+    return jsonify({"stock": stock_rows(db), "report": report_rows(db), "txns": txns, "projects": projects,
                     "today": {"in": today["i"], "out": today["o"]}, "low": LOW_STOCK})
 
 

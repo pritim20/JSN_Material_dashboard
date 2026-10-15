@@ -79,6 +79,23 @@ function stockRows(txns) {
     .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
 }
 
+// Per company (project): every material issued to it with the total quantity
+function reportRows(txns) {
+  const companies = new Map();
+  for (const t of txns) {
+    if (t.type !== "out" || !t.project) continue;
+    const k = mkey(t.project);
+    if (!companies.has(k)) companies.set(k, { company: t.project, items: new Map() });
+    const items = companies.get(k).items;
+    const it = items.get(t.material_key) ?? { name: t.material, qty: 0 };
+    it.qty = r3(it.qty + t.qty);
+    items.set(t.material_key, it);
+  }
+  const lc = (a, b) => a.toLowerCase().localeCompare(b.toLowerCase());
+  return [...companies.values()].sort((a, b) => lc(a.company, b.company))
+    .map(c => ({ company: c.company, items: [...c.items.values()].sort((a, b) => lc(a.name, b.name)) }));
+}
+
 const byNewest = (a, b) => b.ts - a.ts || b.id - a.id;
 
 /* ---------------------------------------------------------------- auth */
@@ -128,7 +145,7 @@ async function login(req) {
 async function apiData() {
   const { doc } = await load();
   const projects = [...new Set(doc.txns.map(t => t.project).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-  return { stock: stockRows(doc.txns), projects };
+  return { stock: stockRows(doc.txns), report: reportRows(doc.txns), projects };
 }
 
 async function apiHistory() {

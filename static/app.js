@@ -44,9 +44,18 @@
   function render() {
     const items = data.stock;
     if ($("#stock")) renderStock(items);
+    if ($("#report")) renderReport();
     fillInSelect();
     $("#projList").innerHTML = data.projects.map(p => `<option value="${esc(p)}"></option>`).join("");
     if (!$("#mOut").hidden) fillOutSelect(true);
+  }
+
+  // one line per company: every material issued to it, with the total quantity
+  function renderReport() {
+    $("#report").innerHTML = (data.report || []).length ? data.report.map(c => `<tr>
+        <td><b>${esc(c.company)}</b></td>
+        <td>${c.items.map(i => `${esc(i.name)}: <b>${fmt(i.qty)}</b>`).join(" &nbsp;·&nbsp; ")}</td>
+      </tr>`).join("") : `<tr><td colspan="2" class="log-empty">No material has been issued yet.</td></tr>`;
   }
 
   function renderStock(items) {
