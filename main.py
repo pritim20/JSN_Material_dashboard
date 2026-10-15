@@ -381,13 +381,13 @@ def export_csv():
     db = get_db()
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow(["Date", "Type", "Material", "Quantity", "By", "Project", "Handed over to"])
+    w.writerow(["Date", "Type", "Material", "Quantity", "By", "Handed over to", "Project"])
     for r in db.execute("SELECT * FROM txns ORDER BY ts DESC, id DESC"):  # newest first, same as History
         t = time.localtime(r["ts"] / 1000)
         w.writerow([time.strftime("%d %b %Y", t),
                     "Material In" if r["type"] == "in" else "Material Out",
                     r["material"], f'{r["qty"]:g}', r["by_name"],
-                    r["project"] or "-", r["handover"] or "-"])
+                    r["handover"] or "-", r["project"] or "-"])
     # BOM so Excel opens the file as UTF-8 and shows it in tidy columns
     return Response("\ufeff" + buf.getvalue(), mimetype="text/csv", content_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": "attachment; filename=jsn-material-history.csv"})

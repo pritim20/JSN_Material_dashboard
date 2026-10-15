@@ -226,11 +226,11 @@ async function exportCsv(url) {
   const tz = Number(url.searchParams.get("tz")) || 0; // browser offset, e.g. -330 for IST
   const { doc } = await load();
   const rows = [...doc.txns].sort(byNewest);
-  const lines = [["Date", "Type", "Material", "Quantity", "By", "Project", "Handed over to"]];
+  const lines = [["Date", "Type", "Material", "Quantity", "By", "Handed over to", "Project"]];
   for (const r of rows) {
     const d = new Date(r.ts - tz * 60000); // shift, then read with UTC getters = viewer's local date
     lines.push([`${String(d.getUTCDate()).padStart(2, "0")} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`,
-      r.type === "in" ? "Material In" : "Material Out", r.material, r.qty, r.by_name, r.project || "-", r.handover || "-"]);
+      r.type === "in" ? "Material In" : "Material Out", r.material, r.qty, r.by_name, r.handover || "-", r.project || "-"]);
   }
   return new Response("﻿" + lines.map(l => l.map(csvCell).join(",")).join("\r\n") + "\r\n", {
     headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": "attachment; filename=jsn-material-history.csv", "Cache-Control": "no-store" },
