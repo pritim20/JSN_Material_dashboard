@@ -17,18 +17,25 @@
       <div><h2>Report</h2></div>
     </div>
 
-    <section class="panel">
-      <div class="tbl-wrap">
-        <table class="report-tbl">
-          <thead><tr><th>Company</th><th>Material</th><th class="num">Quantity</th></tr></thead>
-          <tbody id="report"></tbody>
-        </table>
+    <section style="display:grid;gap:16px">
+      <div class="tools">
+        <div class="field pick">
+          <label for="repCo">Company</label>
+          <select id="repCo"></select>
+        </div>
+        <div class="field pick">
+          <label for="repPr">Project</label>
+          <select id="repPr" disabled></select>
+        </div>
       </div>
+      <div id="repHint" class="empty"><p>Select a company, then a project, to see the material provided.</p></div>
+      <article id="repCard" class="panel rep-card" hidden></article>
     </section>
   </main>
 </div>
 {% include '_modals.html' %}
 <script>window.LOW_STOCK = {{ low_stock }};</script>
 <script src="{{ url_for('static', filename='app.js') }}"></script>
+<script src="{{ url_for('static', filename='report.js') }}"></script>
 </body>
 </html>

@@ -151,11 +151,7 @@ th{text-align:left;font-size:11.5px;letter-spacing:.08em;text-transform:uppercas
 td{padding:12px 16px;border-top:1px solid var(--line);vertical-align:top}
 td.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:700;text-align:right}
 th.num{text-align:right}
-.stock-tbl,.report-tbl{min-width:0}
-.report-tbl td{vertical-align:middle}
-.report-tbl td:first-child{white-space:nowrap;font-weight:600}
-.report-tbl{min-width:480px}
-.report-tbl th.num,.report-tbl td.num{text-align:center}
+.stock-tbl{min-width:0}
 .stock-tbl th.num,.stock-tbl td.num{text-align:center}
 .stock-tbl td{vertical-align:middle}
 td .sub{color:var(--muted);font-size:12.5px}
@@ -192,3 +188,17 @@ td .sub{color:var(--muted);font-size:12.5px}
 .notice .live.off{background:var(--warn)}
 
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* Report */
+.pick{min-width:220px;flex:1;max-width:320px}
+.rep-card{padding:20px;display:grid;gap:18px}
+.rep-card h3{margin:0;font-family:var(--f-display);font-size:22px;letter-spacing:-.01em}
+.rep-card .sub{color:var(--muted);font-size:13px}
+.rep-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+.rep-stat{background:var(--bg);border-radius:14px;padding:12px 14px;display:grid;gap:2px}
+.rep-stat span{color:var(--muted);font-size:12px;letter-spacing:.06em;text-transform:uppercase;font-weight:600}
+.rep-stat b{font-family:var(--f-mono);font-size:22px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.rep-card h4{margin:0 0 8px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.rep-card .tbl-wrap{border:1px solid var(--line);border-radius:14px}
+.rep-card table{min-width:0}
+.rep-card table.wide{min-width:640px}

@@ -45,21 +45,10 @@
   function render() {
     const items = data.stock;
     if ($("#stock")) renderStock(items);
-    if ($("#report")) renderReport();
     fillInSelect();
     $("#coList").innerHTML = [...new Set((data.report || []).map(c => c.company))].map(c => `<option value="${esc(c)}"></option>`).join("");
     $("#projList").innerHTML = data.projects.map(p => `<option value="${esc(p)}"></option>`).join("");
     if (!$("#mOut").hidden) fillOutSelect(true);
-  }
-
-  // Report page: one row per company and material issued to it, with the quantity
-  function renderReport() {
-    const rows = (data.report || []).flatMap(c => c.items.map(i => ({ company: c.company, name: i.name, qty: i.qty })));
-    $("#report").innerHTML = rows.length ? rows.map(r => `<tr>
-        <td>${esc(r.company)}</td>
-        <td>${esc(r.name)}</td>
-        <td class="num">${fmt(r.qty)}</td>
-      </tr>`).join("") : `<tr><td colspan="3" class="log-empty">No material has been issued yet.</td></tr>`;
   }
 
   function renderStock(items) {
