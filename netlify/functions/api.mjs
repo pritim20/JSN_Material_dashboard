@@ -1,12 +1,10 @@
 // JSN AI Material - API (Netlify Function). Replaces the Flask server in main.py.
+// Data is kept in Netlify Blobs (Netlify's built-in storage) - no database to set up.
 // Needs these environment variables (Site configuration -> Environment variables):
-//   NETLIFY_DATABASE_URL   set automatically by Netlify DB
-//   SESSION_SECRET         long random string used to sign the login cookie
-//   ADMIN_PASSWORD         login password   (ADMIN_USER is optional, default "admin")
+//   SESSION_SECRET   long random string used to sign the login cookie
+//   ADMIN_PASSWORD   login password   (ADMIN_USER is optional, default "admin")
 import crypto from "node:crypto";
-import pg from "pg";
-
-pg.types.setTypeParser(20, v => Number(v)); // BIGINT (ts) -> number
+import { getStore } from "@netlify/blobs";
 
 // Netlify.env is the documented way to read variables in functions; process.env is the fallback (local runs).
 const env = name => globalThis.Netlify?.env?.get(name) ?? process.env[name];
@@ -14,55 +12,32 @@ const env = name => globalThis.Netlify?.env?.get(name) ?? process.env[name];
 const COOKIE = "jsn_session";
 const SESSION_SECONDS = 60 * 60 * 12;
 
-/* ---------------------------------------------------------------- db */
-let pool;
-let ready;
-function getPool() {
-  if (!pool) {
-    const url = env("NETLIFY_DATABASE_URL_UNPOOLED") || env("NETLIFY_DATABASE_URL") || env("DATABASE_URL");
-    if (!url) throw new HttpError(500, { error: "Database is not set up. Add Netlify DB to this site." });
-    pool = new pg.Pool({ connectionString: url, max: 1 });
-  }
-  return pool;
-}
-async function db() {
-  const p = getPool();
-  ready ??= p.query(`
-    CREATE TABLE IF NOT EXISTS txns (
-      id           SERIAL PRIMARY KEY,
-      type         TEXT NOT NULL CHECK (type IN ('in','out')),
-      material     TEXT NOT NULL,
-      material_key TEXT NOT NULL,
-      qty          DOUBLE PRECISION NOT NULL CHECK (qty > 0),
-      by_name      TEXT NOT NULL,
-      project      TEXT,
-      handover     TEXT,
-      remarks      TEXT,
-      ts           BIGINT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_txns_key ON txns(material_key);
-    CREATE INDEX IF NOT EXISTS idx_txns_ts  ON txns(ts);`).catch(e => { ready = undefined; throw e; });
-  await ready;
-  return p;
-}
-
-// Writes run one at a time (advisory lock) so two people can't issue the same stock at once.
-async function tx(fn) {
-  const c = await (await db()).connect();
-  try {
-    await c.query("BEGIN");
-    await c.query("SELECT pg_advisory_xact_lock(7331)");
-    const out = await fn(c);
-    await c.query("COMMIT");
-    return out;
-  } catch (e) {
-    await c.query("ROLLBACK").catch(() => {});
-    throw e;
-  } finally { c.release(); }
-}
-
 class HttpError extends Error {
   constructor(status, body) { super(body?.error || "error"); this.status = status; this.body = body; }
+}
+
+/* ---------------------------------------------------------------- storage
+ * All entries live in one JSON document: { nextId, txns: [...] }.
+ * Every write is conditional on the document's ETag, so if two people save at the same moment
+ * one of them re-reads and re-checks the stock instead of overwriting the other. */
+const KEY = "inventory";
+let store;
+const blobs = () => globalThis.__jsnTestStore ?? (store ??= getStore({ name: "jsn-material", consistency: "strong" }));
+
+async function load() {
+  const r = await blobs().getWithMetadata(KEY, { type: "json", consistency: "strong" });
+  return r ? { doc: r.data, etag: r.etag } : { doc: { nextId: 1, txns: [] }, etag: null };
+}
+
+// Run fn(doc) on the current data; fn may change doc (and throw HttpError to refuse). Retries on a conflicting write.
+async function mutate(fn) {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const { doc, etag } = await load();
+    const result = fn(doc);
+    const w = await blobs().setJSON(KEY, doc, etag ? { onlyIfMatch: etag } : { onlyIfNew: true });
+    if (w.modified) return result;
+  }
+  throw new HttpError(503, { error: "Busy - another save was in progress. Try again." });
 }
 
 /* ---------------------------------------------------------------- helpers */
@@ -71,6 +46,7 @@ const mkey = s => clean(s).toLowerCase();
 const json = (body, status = 200, headers = {}) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...headers } });
 const bad = errors => new HttpError(400, { errors });
+const r3 = n => Math.round(n * 1000) / 1000;
 
 function parseQty(v) { const q = Number(v); return Number.isFinite(q) && q > 0 ? q : null; }
 function parseTs(v) { // client-chosen entry time in ms; defaults to now; null if invalid or in the future
@@ -80,29 +56,30 @@ function parseTs(v) { // client-chosen entry time in ms; defaults to now; null i
   return Number.isInteger(ts) && ts >= 946684800000 && ts <= now + 86400000 ? ts : null;
 }
 
-async function balanceOf(c, key) {
-  const { rows: [r] } = await c.query(
-    `SELECT COALESCE(SUM(CASE WHEN type='in' THEN qty ELSE -qty END),0)::float8 AS b,
-            (SELECT material FROM txns WHERE material_key=$1 ORDER BY id LIMIT 1) AS name
-     FROM txns WHERE material_key=$1`, [key]);
-  return [Math.round(r.b * 1000) / 1000, r.name];
+// [balance, display name] for one material; the name is the first entry's spelling
+function balanceOf(txns, key) {
+  let b = 0, name = null;
+  for (const t of txns) {
+    if (t.material_key !== key) continue;
+    b += t.type === "in" ? t.qty : -t.qty;
+    if (name === null) name = t.material; // txns are kept in id order
+  }
+  return [r3(b), name];
 }
 
-async function stockRows(c) {
-  const { rows } = await c.query(`
-    SELECT * FROM (
-      SELECT material_key,
-             (SELECT material FROM txns t2 WHERE t2.material_key = t.material_key ORDER BY id LIMIT 1) AS name,
-             SUM(CASE WHEN type='in'  THEN qty ELSE 0 END)::float8 AS in_qty,
-             SUM(CASE WHEN type='out' THEN qty ELSE 0 END)::float8 AS out_qty,
-             MAX(ts) AS last
-      FROM txns t GROUP BY material_key) s
-    ORDER BY lower(name)`);
-  return rows.map(r => ({
-    key: r.material_key, name: r.name, in: r.in_qty, out: r.out_qty,
-    bal: Math.round((r.in_qty - r.out_qty) * 1000) / 1000, last: r.last,
-  }));
+function stockRows(txns) {
+  const m = new Map();
+  for (const t of txns) {
+    let r = m.get(t.material_key);
+    if (!r) m.set(t.material_key, r = { key: t.material_key, name: t.material, in: 0, out: 0, last: 0 });
+    r[t.type] += t.qty;
+    r.last = Math.max(r.last, t.ts);
+  }
+  return [...m.values()].map(r => ({ ...r, bal: r3(r.in - r.out) }))
+    .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
 }
+
+const byNewest = (a, b) => b.ts - a.ts || b.id - a.id;
 
 /* ---------------------------------------------------------------- auth */
 const b64 = b => Buffer.from(b).toString("base64url");
@@ -149,18 +126,17 @@ async function login(req) {
 }
 
 async function apiData() {
-  const c = await db();
-  const projects = (await c.query(
-    "SELECT DISTINCT project FROM txns WHERE project IS NOT NULL AND project<>'' ORDER BY project")).rows.map(r => r.project);
-  return { stock: await stockRows(c), projects };
+  const { doc } = await load();
+  const projects = [...new Set(doc.txns.map(t => t.project).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  return { stock: stockRows(doc.txns), projects };
 }
 
 async function apiHistory() {
-  const { rows } = await (await db()).query(
-    `SELECT id,type,material,material_key,qty,by_name AS by,project,handover,ts
-     FROM txns ORDER BY ts DESC, id DESC`);
-  return { txns: rows };
+  const { doc } = await load();
+  return { txns: [...doc.txns].sort(byNewest).map(({ by_name, remarks, ...t }) => ({ ...t, by: by_name })) };
 }
+
+const addTxn = (doc, t) => { doc.txns.push({ id: doc.nextId++, remarks: "", project: null, handover: null, ...t }); };
 
 async function apiIn(d) {
   const name = clean(d.material), by = clean(d.by), qty = parseQty(d.qty), ts = parseTs(d.ts);
@@ -171,12 +147,10 @@ async function apiIn(d) {
   if (ts === null) errors.date = "Pick a valid date (not in the future).";
   if (Object.keys(errors).length) throw bad(errors);
 
-  const display = await tx(async c => {
+  const display = await mutate(doc => {
     const key = mkey(name);
-    const [, existing] = await balanceOf(c, key);
-    const shown = existing || name;
-    await c.query("INSERT INTO txns(type,material,material_key,qty,by_name,remarks,ts) VALUES('in',$1,$2,$3,$4,'',$5)",
-      [shown, key, qty, by, ts]);
+    const shown = balanceOf(doc.txns, key)[1] || name;
+    addTxn(doc, { type: "in", material: shown, material_key: key, qty, by_name: by, ts });
     return shown;
   });
   return { ok: true, message: `Added ${qty} × ${display} to stock` };
@@ -194,21 +168,19 @@ async function apiOut(d) {
   if (ts === null) errors.date = "Pick a valid date (not in the future).";
   if (Object.keys(errors).length) throw bad(errors);
 
-  const name = await tx(async c => {
-    const [bal, name] = await balanceOf(c, key);
+  const name = await mutate(doc => {
+    const [bal, name] = balanceOf(doc.txns, key);
     if (!name || bal <= 0) throw bad({ mat: "This material is not in stock." });
     if (qty > bal + 1e-9) throw bad({ qty: `Only ${bal} available.` });
-    await c.query(
-      "INSERT INTO txns(type,material,material_key,qty,by_name,project,handover,remarks,ts) VALUES('out',$1,$2,$3,$4,$5,$6,'',$7)",
-      [name, key, qty, by, project, handover, ts]);
+    addTxn(doc, { type: "out", material: name, material_key: key, qty, by_name: by, project, handover, ts });
     return name;
   });
   return { ok: true, message: `Issued ${qty} × ${name} to ${project}` };
 }
 
 async function apiEdit(id, d) {
-  await tx(async c => {
-    const { rows: [row] } = await c.query("SELECT * FROM txns WHERE id=$1", [id]);
+  await mutate(doc => {
+    const row = doc.txns.find(t => t.id === id);
     if (!row) throw new HttpError(404, { errors: { qty: "This entry no longer exists." } });
     const isIn = row.type === "in";
     const qty = parseQty(d.qty), by = clean(d.by), ts = parseTs(d.ts);
@@ -224,13 +196,13 @@ async function apiEdit(id, d) {
     if (!isIn && !handover) errors.handover = "Enter who received it.";
     if (Object.keys(errors).length) throw bad(errors);
 
-    const [, existing] = await balanceOf(c, key);
+    const oldKey = row.material_key;
+    const existing = balanceOf(doc.txns, key)[1];
     if (!isIn && !existing) throw bad({ mat: "This material is not in stock." });
-    await c.query(
-      "UPDATE txns SET material=$1, material_key=$2, qty=$3, by_name=$4, project=$5, handover=$6, ts=$7 WHERE id=$8",
-      [existing || name, key, qty, by, isIn ? null : project, isIn ? null : handover, ts, id]);
-    for (const k of new Set([row.material_key, key])) {
-      const [bal, nm] = await balanceOf(c, k);
+    Object.assign(row, { material: existing || name, material_key: key, qty, by_name: by,
+      project: isIn ? null : project, handover: isIn ? null : handover, ts });
+    for (const k of new Set([oldKey, key])) {
+      const [bal, nm] = balanceOf(doc.txns, k);
       if (bal < -1e-9) throw bad({ qty: `This change would leave ${nm} with ${bal} in stock.` });
     }
   });
@@ -238,10 +210,11 @@ async function apiEdit(id, d) {
 }
 
 async function apiDelete(id) {
-  await tx(async c => {
-    const { rows: [row] } = await c.query("DELETE FROM txns WHERE id=$1 RETURNING material, material_key", [id]);
-    if (!row) throw new HttpError(404, { errors: { qty: "This entry no longer exists." } });
-    const [bal] = await balanceOf(c, row.material_key);
+  await mutate(doc => {
+    const i = doc.txns.findIndex(t => t.id === id);
+    if (i < 0) throw new HttpError(404, { errors: { qty: "This entry no longer exists." } });
+    const [row] = doc.txns.splice(i, 1);
+    const [bal] = balanceOf(doc.txns, row.material_key);
     if (bal < -1e-9) throw bad({ qty: `Can't delete: ${row.material} would be left with ${bal} in stock.` });
   });
   return { ok: true, message: "Entry deleted" };
@@ -251,7 +224,8 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 const csvCell = v => { v = String(v ?? ""); return /[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v; };
 async function exportCsv(url) {
   const tz = Number(url.searchParams.get("tz")) || 0; // browser offset, e.g. -330 for IST
-  const { rows } = await (await db()).query("SELECT * FROM txns ORDER BY ts DESC, id DESC");
+  const { doc } = await load();
+  const rows = [...doc.txns].sort(byNewest);
   const lines = [["Date", "Type", "Material", "Quantity", "By", "Project", "Handed over to"]];
   for (const r of rows) {
     const d = new Date(r.ts - tz * 60000); // shift, then read with UTC getters = viewer's local date
@@ -272,7 +246,7 @@ export default async (req) => {
 
     if (path === "/api/health" && m === "GET") // setup check: says only whether each setting exists, never its value
       return json({ ADMIN_PASSWORD: !!env("ADMIN_PASSWORD"), SESSION_SECRET: !!env("SESSION_SECRET"), ADMIN_USER: !!env("ADMIN_USER"),
-                    database: !!(env("NETLIFY_DATABASE_URL") || env("NETLIFY_DATABASE_URL_UNPOOLED") || env("DATABASE_URL")) });
+                    storage: await load().then(() => true, () => false) });
     if (path === "/api/login" && m === "POST") return await login(req);
     if (path === "/logout") return new Response(null, { status: 302, headers: { Location: "/login", "Set-Cookie": cookie("", 0) } });
 

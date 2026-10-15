@@ -76,7 +76,7 @@ jsn-ai-material/
 The Netlify version lives in `public/` (pages), `netlify/functions/api.mjs` (API) and `netlify.toml`. The Flask files (`main.py`, `templates/`, `static/`) are only for running on your own PC and are not used on Netlify.
 
 1. Push this folder to GitHub/GitLab and choose **Add new site → Import an existing project** in Netlify. The build settings come from `netlify.toml`.
-2. In the site, open **Extensions / Database** and add **Netlify DB**. This sets `NETLIFY_DATABASE_URL`. The table is created automatically on the first request.
+2. No database to set up. Entries are stored in Netlify Blobs, Netlify's built-in storage, which is enabled automatically for every site.
 3. Under **Site configuration → Environment variables** add:
 
 | Variable | Purpose |
@@ -87,4 +87,4 @@ The Netlify version lives in `public/` (pages), `netlify/functions/api.mjs` (API
 
 4. Deploy. Open the site URL and sign in.
 
-Notes: the Netlify version starts with an empty database. The old `inventory.db` is not copied over. After changing a variable, trigger a new deploy.
+Notes: the Netlify version starts with no entries. The old `inventory.db` is not copied over. After changing a variable, trigger a new deploy.
